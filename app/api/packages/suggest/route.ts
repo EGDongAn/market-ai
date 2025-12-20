@@ -1,101 +1,139 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { generateJSON } from '@/lib/ai';
+import { searchProcedures } from '@/lib/vector-search';
+import { packageSuggestionPrompt } from '@/lib/prompts';
+
+interface SuggestionRequest {
+  intent?: string;
+  budget?: number;
+  procedureCount?: number;
+}
+
+interface PackageSuggestion {
+  name: string;
+  description: string;
+  rationale: string;
+  discountRate: number;
+}
 
 // POST /api/packages/suggest - AI package suggestion
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
-    // Get popular procedures (those with the most price data)
-    const proceduresWithPrices = await prisma.market_procedures.findMany({
-      include: {
-        prices: {
-          where: {
-            regular_price: { not: null },
-          },
-          orderBy: {
-            crawled_at: 'desc',
-          },
-          take: 1,
+    const body: SuggestionRequest = await request.json();
+    const { intent, budget, procedureCount = 3 } = body;
+
+    // Get procedures based on intent or popularity
+    let procedures;
+    if (intent) {
+      // Use semantic search
+      const searchResults = await searchProcedures(intent, { limit: procedureCount * 2 });
+      const procedureIds = searchResults.map(r => r.id);
+      procedures = await prisma.market_procedures.findMany({
+        where: { id: { in: procedureIds } },
+        include: {
+          subcategory: { include: { category: true } },
+          our_prices: { where: { is_active: true }, take: 1 }
+        }
+      });
+    } else {
+      // Get procedures with active prices
+      procedures = await prisma.market_procedures.findMany({
+        where: {
+          our_prices: { some: { is_active: true } }
         },
-        our_prices: {
-          where: {
-            is_active: true,
-          },
-          orderBy: {
-            created_at: 'desc',
-          },
-          take: 1,
+        include: {
+          subcategory: { include: { category: true } },
+          our_prices: { where: { is_active: true }, take: 1 }
         },
-      },
+        take: procedureCount * 3
+      });
+    }
+
+    if (procedures.length === 0) {
+      return NextResponse.json({ suggestions: [] });
+    }
+
+    // Get competitor prices for context
+    const procedureIds = procedures.map(p => p.id);
+    const competitorPrices = await prisma.market_prices.groupBy({
+      by: ['procedure_id'],
+      where: { procedure_id: { in: procedureIds } },
+      _avg: { regular_price: true }
     });
 
-    // Filter procedures that have price data
-    const proceduresWithData = proceduresWithPrices.filter(
-      (p) => p.prices.length > 0 || p.our_prices.length > 0
-    );
+    const priceMap = new Map(competitorPrices.map(p => [
+      p.procedure_id,
+      p._avg.regular_price?.toNumber() || 0
+    ]));
 
-    // Mock AI suggestions - generate sample packages
-    const suggestions = [
-      {
-        name: '안티에이징 풀코스',
-        description: '피부 노화 방지를 위한 종합 케어 패키지',
-        procedures: proceduresWithData.slice(0, 3).map((proc) => ({
-          procedure_id: proc.id,
-          procedure_name: proc.name,
-          quantity: 1,
-          unit_price: proc.our_prices[0]?.regular_price || proc.prices[0]?.regular_price || 100000,
-        })),
-        discount_rate: 15,
-        ai_rationale: '가장 인기 있는 안티에이징 시술을 조합하여 시너지 효과를 극대화합니다. 경쟁사 대비 15% 할인으로 가격 경쟁력을 확보할 수 있습니다.',
-      },
-      {
-        name: '리프팅 스페셜',
-        description: '탄력 개선을 위한 집중 리프팅 패키지',
-        procedures: proceduresWithData.slice(2, 5).map((proc) => ({
-          procedure_id: proc.id,
-          procedure_name: proc.name,
-          quantity: 2,
-          unit_price: proc.our_prices[0]?.regular_price || proc.prices[0]?.regular_price || 150000,
-        })),
-        discount_rate: 20,
-        ai_rationale: '리프팅 효과가 뛰어난 시술들을 2회씩 구성하여 지속적인 개선 효과를 제공합니다. 20% 할인율로 높은 가치를 제공합니다.',
-      },
-      {
-        name: '미백 집중 케어',
-        description: '밝고 투명한 피부를 위한 미백 패키지',
-        procedures: proceduresWithData.slice(1, 4).map((proc) => ({
-          procedure_id: proc.id,
-          procedure_name: proc.name,
-          quantity: 1,
-          unit_price: proc.our_prices[0]?.regular_price || proc.prices[0]?.regular_price || 120000,
-        })),
-        discount_rate: 10,
-        ai_rationale: '미백에 효과적인 시술들을 조합하여 종합적인 피부 톤 개선 효과를 제공합니다. 시장 평균 대비 경쟁력 있는 가격으로 구성했습니다.',
-      },
-    ];
+    // Generate suggestions using AI
+    const suggestions: {
+      name: string;
+      description: string;
+      procedures: typeof procedures;
+      rationale: string;
+      discountRate: number;
+      totalPrice: number;
+    }[] = [];
 
-    // Filter out suggestions with no procedures
-    const validSuggestions = suggestions.filter((s) => s.procedures.length > 0);
+    // Create 3 different package combinations
+    for (let i = 0; i < 3; i++) {
+      const startIdx = i * procedureCount;
+      const packageProcedures = procedures.slice(startIdx, startIdx + procedureCount);
 
-    // Calculate total prices for each suggestion
-    const suggestionsWithPrices = validSuggestions.map((suggestion) => {
-      const subtotal = suggestion.procedures.reduce(
-        (sum, proc) => sum + Number(proc.unit_price) * proc.quantity,
-        0
-      );
-      const total_price = subtotal * (1 - suggestion.discount_rate / 100);
+      if (packageProcedures.length < 2) continue;
 
-      return {
-        ...suggestion,
-        total_price: Math.round(total_price),
-        subtotal: Math.round(subtotal),
-      };
-    });
+      const prompt = packageSuggestionPrompt
+        .replace('{{procedures}}', JSON.stringify(packageProcedures.map(p => ({
+          name: p.name,
+          category: p.subcategory.category.name,
+          price: p.our_prices[0]?.regular_price?.toString()
+        }))))
+        .replace('{{competitorPrices}}', JSON.stringify(
+          packageProcedures.map(p => ({
+            name: p.name,
+            avgPrice: priceMap.get(p.id)
+          }))
+        ));
 
-    return NextResponse.json(suggestionsWithPrices);
+      try {
+        const aiSuggestion = await generateJSON<PackageSuggestion>(prompt);
+
+        const totalPrice = packageProcedures.reduce((sum, p) =>
+          sum + (p.our_prices[0]?.regular_price?.toNumber() || 0), 0
+        );
+
+        suggestions.push({
+          name: aiSuggestion.name,
+          description: aiSuggestion.description,
+          procedures: packageProcedures,
+          rationale: aiSuggestion.rationale,
+          discountRate: aiSuggestion.discountRate,
+          totalPrice: Math.round(totalPrice * (1 - aiSuggestion.discountRate / 100))
+        });
+      } catch (err) {
+        console.error('AI suggestion failed:', err);
+        // Fallback to simple suggestion
+        const totalPrice = packageProcedures.reduce((sum, p) =>
+          sum + (p.our_prices[0]?.regular_price?.toNumber() || 0), 0
+        );
+        suggestions.push({
+          name: `${packageProcedures[0].subcategory.category.name} 스페셜`,
+          description: `인기 ${packageProcedures[0].subcategory.category.name} 시술 패키지`,
+          procedures: packageProcedures,
+          rationale: '인기 시술 조합으로 구성된 패키지입니다.',
+          discountRate: 15,
+          totalPrice: Math.round(totalPrice * 0.85)
+        });
+      }
+    }
+
+    return NextResponse.json({ suggestions });
   } catch (error) {
-    console.error('Error generating package suggestions:', error);
+    console.error('Failed to generate suggestions:', error);
     return NextResponse.json(
-      { error: 'AI 패키지 제안 생성 중 오류가 발생했습니다.' },
+      { error: 'Failed to generate suggestions' },
       { status: 500 }
     );
   }

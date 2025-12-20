@@ -584,6 +584,17 @@ model market_procedures {
   our_prices     market_our_prices[]
   package_items  market_package_procedures[]
   trends         market_procedure_trends[]
+  embedding      market_procedure_embeddings?
+}
+
+model market_procedure_embeddings {
+  id            Int               @id @default(autoincrement())
+  procedure_id  Int               @unique
+  procedure     market_procedures @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
+  embedding     Json              // Array of 768 floats stored as JSON
+  content       String
+  created_at    DateTime          @default(now())
+  updated_at    DateTime          @updatedAt
 }
 
 model market_prices {
