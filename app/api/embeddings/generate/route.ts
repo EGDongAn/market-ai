@@ -7,8 +7,8 @@ export async function POST() {
     // Get all procedures
     const procedures = await prisma.market_procedures.findMany({
       include: {
-        subcategory: {
-          include: { category: true }
+        market_procedure_subcategories: {
+          include: { market_procedure_categories: true }
         }
       }
     })
@@ -25,8 +25,8 @@ export async function POST() {
           procedure.name,
           procedure.brand,
           ...aliases,
-          procedure.subcategory.name,
-          procedure.subcategory.category.name
+          procedure.market_procedure_subcategories?.name,
+          procedure.market_procedure_subcategories?.market_procedure_categories?.name
         ].filter(Boolean).join(' ')
 
         // Generate embedding

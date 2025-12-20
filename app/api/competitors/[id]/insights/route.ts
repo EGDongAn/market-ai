@@ -36,9 +36,13 @@ export async function GET(
     const competitorPrices = await prisma.market_prices.findMany({
       where: { competitor_id: competitorId },
       include: {
-        procedure: {
+        market_procedures: {
           include: {
-            subcategory: { include: { category: true } }
+            market_procedure_subcategories: {
+              include: {
+                market_procedure_categories: true
+              }
+            }
           }
         }
       },
@@ -69,8 +73,8 @@ export async function GET(
       const diff = marketAvg > 0 ? ((competitorPrice - marketAvg) / marketAvg * 100).toFixed(1) : 0;
 
       return {
-        procedure: price.procedure.name,
-        category: price.procedure.subcategory.category.name,
+        procedure: price.market_procedures?.name || '',
+        category: price.market_procedures?.market_procedure_subcategories?.market_procedure_categories?.name || '',
         competitorPrice,
         marketAvg: Math.round(marketAvg),
         diff: `${diff}%`

@@ -9,7 +9,7 @@ export async function GET(request: Request) {
 
     const where: {
       subcategory_id?: number;
-      subcategory?: {
+      market_procedure_subcategories?: {
         category_id: number;
       };
     } = {}
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     if (subcategoryId) {
       where.subcategory_id = parseInt(subcategoryId)
     } else if (categoryId) {
-      where.subcategory = {
+      where.market_procedure_subcategories = {
         category_id: parseInt(categoryId)
       }
     }
@@ -25,9 +25,9 @@ export async function GET(request: Request) {
     const procedures = await prisma.market_procedures.findMany({
       where,
       include: {
-        subcategory: {
+        market_procedure_subcategories: {
           include: {
-            category: true
+            market_procedure_categories: true
           }
         }
       },
@@ -72,9 +72,9 @@ export async function POST(request: Request) {
         unit: unit || null
       },
       include: {
-        subcategory: {
+        market_procedure_subcategories: {
           include: {
-            category: true
+            market_procedure_categories: true
           }
         }
       }

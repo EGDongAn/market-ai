@@ -13,11 +13,11 @@ export async function GET(
     const price = await prisma.market_our_prices.findUnique({
       where: { id },
       include: {
-        procedure: {
+        market_procedures: {
           include: {
-            subcategory: {
+            market_procedure_subcategories: {
               include: {
-                category: true,
+                market_procedure_categories: true,
               },
             },
           },
@@ -45,16 +45,16 @@ export async function GET(
     const formattedPrice = {
       id: price.id,
       procedure_id: price.procedure_id,
-      procedure_name: price.procedure.name,
-      category: price.procedure.subcategory.category.name,
-      subcategory: price.procedure.subcategory.name,
-      brand: price.procedure.brand,
+      procedure_name: price.market_procedures?.name || '',
+      category: price.market_procedures?.market_procedure_subcategories?.market_procedure_categories?.name || '',
+      subcategory: price.market_procedures?.market_procedure_subcategories?.name || '',
+      brand: price.market_procedures?.brand || null,
       regular_price: regularPrice,
       event_price: price.event_price ? Number(price.event_price) : null,
       cost_price: costPrice,
       margin_percent: margin ? Math.round(margin * 10) / 10 : null,
       valid_from: price.valid_from,
-      valid_to: price.valid_to,
+      valid_until: price.valid_until,
       is_active: price.is_active,
       created_at: price.created_at,
       updated_at: price.updated_at,
@@ -106,7 +106,7 @@ export async function PATCH(
       event_price?: number | null;
       cost_price?: number | null;
       valid_from?: Date;
-      valid_to?: Date | null;
+      valid_until?: Date | null;
       is_active?: boolean;
     } = {};
 
@@ -122,8 +122,8 @@ export async function PATCH(
     if (body.valid_from !== undefined) {
       updateData.valid_from = new Date(body.valid_from);
     }
-    if (body.valid_to !== undefined) {
-      updateData.valid_to = body.valid_to ? new Date(body.valid_to) : null;
+    if (body.valid_until !== undefined || body.valid_to !== undefined) {
+      updateData.valid_until = (body.valid_until || body.valid_to) ? new Date(body.valid_until || body.valid_to) : null;
     }
     if (body.is_active !== undefined) {
       updateData.is_active = body.is_active;
@@ -133,11 +133,11 @@ export async function PATCH(
       where: { id },
       data: updateData,
       include: {
-        procedure: {
+        market_procedures: {
           include: {
-            subcategory: {
+            market_procedure_subcategories: {
               include: {
-                category: true,
+                market_procedure_categories: true,
               },
             },
           },

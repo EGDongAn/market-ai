@@ -32,9 +32,9 @@ export async function POST(request: NextRequest) {
     const ourPrices = await prisma.market_our_prices.findMany({
       where: { is_active: true },
       include: {
-        procedure: {
+        market_procedures: {
           include: {
-            subcategory: { include: { category: true } }
+            market_procedure_subcategories: { include: { market_procedure_categories: true } }
           }
         }
       }
@@ -85,9 +85,9 @@ export async function POST(request: NextRequest) {
 
       return {
         id: op.procedure_id,
-        name: op.procedure?.name || '알 수 없음',
-        category: op.procedure?.subcategory?.category?.name || '기타',
-        subcategory: op.procedure?.subcategory?.name || '기타',
+        name: op.market_procedures?.name || '알 수 없음',
+        category: op.market_procedures?.market_procedure_subcategories?.market_procedure_categories?.name || '기타',
+        subcategory: op.market_procedures?.market_procedure_subcategories?.name || '기타',
         ourPrice,
         cost,
         marketAvg: Math.round(marketAvg),

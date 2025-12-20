@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const configs = await prisma.market_crawl_configs.findMany({
       include: {
-        competitor: true,
+        market_competitors: true,
       },
       orderBy: {
         created_at: 'desc',
@@ -25,19 +25,18 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { competitor_id, crawl_type, target_url, schedule, frequency, is_active } = body;
+    const { competitor_id, config_type, selectors, schedule, is_active } = body;
 
     const config = await prisma.market_crawl_configs.create({
       data: {
         competitor_id,
-        crawl_type,
-        target_url,
+        config_type,
+        selectors,
         schedule,
-        frequency,
         is_active: is_active ?? true,
       },
       include: {
-        competitor: true,
+        market_competitors: true,
       },
     });
 

@@ -8,26 +8,26 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const skip = (page - 1) * limit
 
-    const notifications = await prisma.market_alert_notifications.findMany({
+    const history = await prisma.market_alert_history.findMany({
       include: {
-        alert: {
+        market_alerts: {
           select: {
-            name: true,
+            alert_type: true,
           },
         },
       },
       orderBy: {
-        sent_at: 'desc',
+        triggered_at: 'desc',
       },
       skip,
       take: limit,
     })
 
-    return NextResponse.json(notifications)
+    return NextResponse.json(history)
   } catch (error) {
-    console.error('Failed to fetch notifications:', error)
+    console.error('Failed to fetch alert history:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch notifications' },
+      { error: 'Failed to fetch alert history' },
       { status: 500 }
     )
   }
@@ -39,19 +39,19 @@ export async function PATCH(request: NextRequest) {
     const { id } = body
 
     if (!id) {
-      return NextResponse.json({ error: 'Notification ID is required' }, { status: 400 })
+      return NextResponse.json({ error: 'History ID is required' }, { status: 400 })
     }
 
-    const notification = await prisma.market_alert_notifications.update({
+    const history = await prisma.market_alert_history.update({
       where: { id: parseInt(id) },
       data: { is_read: true },
     })
 
-    return NextResponse.json(notification)
+    return NextResponse.json(history)
   } catch (error) {
-    console.error('Failed to mark notification as read:', error)
+    console.error('Failed to mark history as read:', error)
     return NextResponse.json(
-      { error: 'Failed to mark notification as read' },
+      { error: 'Failed to mark history as read' },
       { status: 500 }
     )
   }

@@ -12,8 +12,8 @@ export async function GET(request: NextRequest) {
     const where: {
       competitor_id?: number;
       procedure_id?: number;
-      procedure?: {
-        subcategory: {
+      market_procedures?: {
+        market_procedure_subcategories: {
           id?: number;
           category_id?: number;
         };
@@ -29,21 +29,21 @@ export async function GET(request: NextRequest) {
     }
 
     if (categoryId || subcategoryId) {
-      where.procedure = {
-        subcategory: {}
+      where.market_procedures = {
+        market_procedure_subcategories: {}
       }
 
       if (subcategoryId) {
-        where.procedure.subcategory.id = parseInt(subcategoryId)
+        where.market_procedures.market_procedure_subcategories.id = parseInt(subcategoryId)
       } else if (categoryId) {
-        where.procedure.subcategory.category_id = parseInt(categoryId)
+        where.market_procedures.market_procedure_subcategories.category_id = parseInt(categoryId)
       }
     }
 
     const prices = await prisma.market_prices.findMany({
       where,
       include: {
-        competitor: {
+        market_competitors: {
           select: {
             id: true,
             name: true,
@@ -51,17 +51,17 @@ export async function GET(request: NextRequest) {
             type: true,
           }
         },
-        procedure: {
+        market_procedures: {
           select: {
             id: true,
             name: true,
             brand: true,
             unit: true,
-            subcategory: {
+            market_procedure_subcategories: {
               select: {
                 id: true,
                 name: true,
-                category: {
+                market_procedure_categories: {
                   select: {
                     id: true,
                     name: true,
@@ -124,12 +124,11 @@ export async function POST(request: NextRequest) {
         regular_price: regular_price ? parseFloat(regular_price) : null,
         event_price: event_price ? parseFloat(event_price) : null,
         source_url,
-        source_type,
         crawled_at: new Date(),
       },
       include: {
-        competitor: true,
-        procedure: true,
+        market_competitors: true,
+        market_procedures: true,
       }
     })
 
@@ -173,11 +172,12 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      if (priceChanges.length > 0) {
-        await prisma.market_price_history.createMany({
-          data: priceChanges
-        })
-      }
+      // TODO: Implement price history tracking when market_price_history table is created
+      // if (priceChanges.length > 0) {
+      //   await prisma.market_price_history.createMany({
+      //     data: priceChanges
+      //   })
+      // }
     }
 
     return NextResponse.json({

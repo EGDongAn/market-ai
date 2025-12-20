@@ -22,9 +22,9 @@ export async function GET() {
     // 카테고리 목록 조회
     const categories = await prisma.market_procedure_categories.findMany({
       include: {
-        subcategories: {
+        market_procedure_subcategories: {
           include: {
-            procedures: true
+            market_procedures: true
           }
         }
       }
@@ -39,9 +39,13 @@ export async function GET() {
         crawled_at: { gte: thirtyDaysAgo }
       },
       include: {
-        procedure: {
+        market_procedures: {
           include: {
-            subcategory: { include: { category: true } }
+            market_procedure_subcategories: {
+              include: {
+                market_procedure_categories: true
+              }
+            }
           }
         }
       }
@@ -56,8 +60,8 @@ export async function GET() {
     }>()
 
     for (const price of prices) {
-      const categoryId = price.procedure?.subcategory?.category?.id
-      const categoryName = price.procedure?.subcategory?.category?.name
+      const categoryId = price.market_procedures?.market_procedure_subcategories?.market_procedure_categories?.id
+      const categoryName = price.market_procedures?.market_procedure_subcategories?.market_procedure_categories?.name
 
       if (!categoryId || !categoryName) continue
 

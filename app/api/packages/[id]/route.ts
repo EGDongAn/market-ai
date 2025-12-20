@@ -16,9 +16,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const pkg = await prisma.market_packages.findUnique({
       where: { id: packageId },
       include: {
-        procedures: {
+        market_package_items: {
           include: {
-            procedure: true,
+            market_procedures: true,
           },
         },
       },
@@ -47,10 +47,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const packageId = parseInt(id);
     const body = await request.json();
-    const { name, description, total_price, discount_rate, source, ai_rationale, is_active, procedures } = body;
+    const { name, description, package_price, regular_price, is_ai_suggested, ai_rationale, is_active, procedures } = body;
 
     // Delete existing procedures and create new ones
-    await prisma.market_package_procedures.deleteMany({
+    await prisma.market_package_items.deleteMany({
       where: { package_id: packageId },
     });
 
@@ -59,23 +59,23 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       data: {
         name,
         description,
-        total_price,
-        discount_rate: discount_rate || null,
-        source: source || 'Manual',
+        package_price: package_price || null,
+        regular_price: regular_price || null,
+        is_ai_suggested: is_ai_suggested || false,
         ai_rationale: ai_rationale || null,
         is_active: is_active !== undefined ? is_active : true,
-        procedures: {
-          create: procedures.map((proc: { procedure_id: number; quantity?: number; unit_price: number }) => ({
+        market_package_items: {
+          create: procedures.map((proc: { procedure_id: number; quantity?: number; discount_percent?: number }) => ({
             procedure_id: proc.procedure_id,
             quantity: proc.quantity || 1,
-            unit_price: proc.unit_price,
+            discount_percent: proc.discount_percent || 0,
           })),
         },
       },
       include: {
-        procedures: {
+        market_package_items: {
           include: {
-            procedure: true,
+            market_procedures: true,
           },
         },
       },

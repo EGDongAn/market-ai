@@ -52,26 +52,26 @@ export async function searchProcedures(
 
     // Build where clause
     const whereClause: {
-      procedure?: {
+      market_procedures?: {
         subcategory_id?: number
-        subcategory?: { category_id?: number }
+        market_procedure_subcategories?: { category_id?: number }
       }
     } = {}
 
     if (subcategoryId) {
-      whereClause.procedure = { subcategory_id: subcategoryId }
+      whereClause.market_procedures = { subcategory_id: subcategoryId }
     } else if (categoryId) {
-      whereClause.procedure = { subcategory: { category_id: categoryId } }
+      whereClause.market_procedures = { market_procedure_subcategories: { category_id: categoryId } }
     }
 
     // Get all embeddings from database
     const embeddings = await prisma.market_procedure_embeddings.findMany({
       where: whereClause,
       include: {
-        procedure: {
+        market_procedures: {
           include: {
-            subcategory: {
-              include: { category: true }
+            market_procedure_subcategories: {
+              include: { market_procedure_categories: true }
             }
           }
         }
@@ -84,17 +84,17 @@ export async function searchProcedures(
         const storedEmbedding = e.embedding as number[]
         const similarity = cosineSimilarity(queryEmbedding, storedEmbedding)
         return {
-          id: e.procedure.id,
-          name: e.procedure.name,
-          brand: e.procedure.brand,
-          aliases: e.procedure.aliases as string[] | null,
+          id: e.market_procedures.id,
+          name: e.market_procedures.name,
+          brand: e.market_procedures.brand,
+          aliases: e.market_procedures.aliases as string[] | null,
           similarity,
           subcategory: {
-            id: e.procedure.subcategory.id,
-            name: e.procedure.subcategory.name,
+            id: e.market_procedures.market_procedure_subcategories!.id,
+            name: e.market_procedures.market_procedure_subcategories!.name,
             category: {
-              id: e.procedure.subcategory.category.id,
-              name: e.procedure.subcategory.category.name
+              id: e.market_procedures.market_procedure_subcategories!.market_procedure_categories!.id,
+              name: e.market_procedures.market_procedure_subcategories!.market_procedure_categories!.name
             }
           }
         }
@@ -120,7 +120,7 @@ async function fallbackTextSearch(
   const whereClause: {
     OR?: Array<{ name?: { contains: string; mode: 'insensitive' }; brand?: { contains: string; mode: 'insensitive' } }>
     subcategory_id?: number
-    subcategory?: { category_id?: number }
+    market_procedure_subcategories?: { category_id?: number }
   } = {
     OR: [
       { name: { contains: query, mode: 'insensitive' } },
@@ -131,14 +131,14 @@ async function fallbackTextSearch(
   if (subcategoryId) {
     whereClause.subcategory_id = subcategoryId
   } else if (categoryId) {
-    whereClause.subcategory = { category_id: categoryId }
+    whereClause.market_procedure_subcategories = { category_id: categoryId }
   }
 
   const procedures = await prisma.market_procedures.findMany({
     where: whereClause,
     include: {
-      subcategory: {
-        include: { category: true }
+      market_procedure_subcategories: {
+        include: { market_procedure_categories: true }
       }
     },
     take: limit
@@ -151,11 +151,11 @@ async function fallbackTextSearch(
     aliases: p.aliases as string[] | null,
     similarity: 0.5, // Default similarity for text search
     subcategory: {
-      id: p.subcategory.id,
-      name: p.subcategory.name,
+      id: p.market_procedure_subcategories!.id,
+      name: p.market_procedure_subcategories!.name,
       category: {
-        id: p.subcategory.category.id,
-        name: p.subcategory.category.name
+        id: p.market_procedure_subcategories!.market_procedure_categories!.id,
+        name: p.market_procedure_subcategories!.market_procedure_categories!.name
       }
     }
   }))
@@ -168,8 +168,8 @@ export async function findSimilarProcedures(
   const procedure = await prisma.market_procedures.findUnique({
     where: { id: procedureId },
     include: {
-      subcategory: {
-        include: { category: true }
+      market_procedure_subcategories: {
+        include: { market_procedure_categories: true }
       }
     }
   })

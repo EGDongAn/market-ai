@@ -58,13 +58,13 @@ export async function POST(request: NextRequest) {
         crawled_at: p.crawled_at,
         competitor_id: p.competitor_id,
       }))
-      .filter((p) => p.price !== null);
+      .filter((p) => p.price !== null && p.crawled_at !== null);
 
     // 기간별로 가격 집계
     const aggregated = aggregatePricesByPeriod(
       priceData.map((p) => ({
         price: p.price!,
-        crawled_at: p.crawled_at,
+        crawled_at: p.crawled_at!,
       })),
       periodEnum
     );
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     // 경쟁사 수 집계 (기간별)
     const competitorsByPeriod = new Map<string, Set<number>>();
     priceData.forEach(({ crawled_at, competitor_id }) => {
-      const periodKey = getPeriodKey(crawled_at, periodEnum);
+      const periodKey = getPeriodKey(crawled_at!, periodEnum);
       if (!competitorsByPeriod.has(periodKey)) {
         competitorsByPeriod.set(periodKey, new Set());
       }
@@ -110,28 +110,26 @@ export async function POST(request: NextRequest) {
       previousAvgPrice = priceStats.avg_price;
     }
 
-    // 기존 트렌드 데이터 삭제 후 삽입 (upsert)
-    await prisma.$transaction(async (tx) => {
-      // 해당 조건의 기존 데이터 삭제
-      await tx.market_procedure_trends.deleteMany({
-        where: {
-          procedure_id: parseInt(procedure_id),
-          period: periodEnum,
-          ...(start_date &&
-            end_date && {
-              period_date: {
-                gte: new Date(start_date),
-                lte: new Date(end_date),
-              },
-            }),
-        },
-      });
-
-      // 새 데이터 삽입
-      await tx.market_procedure_trends.createMany({
-        data: trends,
-      });
-    });
+    // TODO: Implement when market_procedure_trends table is created
+    // Trends table doesn't exist yet - just return the calculated data
+    // await prisma.$transaction(async (tx) => {
+    //   await tx.market_procedure_trends.deleteMany({
+    //     where: {
+    //       procedure_id: parseInt(procedure_id),
+    //       period: periodEnum,
+    //       ...(start_date &&
+    //         end_date && {
+    //           period_date: {
+    //             gte: new Date(start_date),
+    //             lte: new Date(end_date),
+    //           },
+    //         }),
+    //     },
+    //   });
+    //   await tx.market_procedure_trends.createMany({
+    //     data: trends,
+    //   });
+    // });
 
     return NextResponse.json({
       success: true,

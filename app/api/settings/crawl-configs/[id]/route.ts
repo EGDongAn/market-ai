@@ -10,7 +10,7 @@ export async function GET(
     const config = await prisma.market_crawl_configs.findUnique({
       where: { id: parseInt(id) },
       include: {
-        competitor: true,
+        market_competitors: true,
       },
     });
 
@@ -38,20 +38,19 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { competitor_id, crawl_type, target_url, schedule, frequency, is_active } = body;
+    const { competitor_id, config_type, selectors, schedule, is_active } = body;
 
     const config = await prisma.market_crawl_configs.update({
       where: { id: parseInt(id) },
       data: {
         competitor_id,
-        crawl_type,
-        target_url,
+        config_type,
+        selectors,
         schedule,
-        frequency,
         is_active,
       },
       include: {
-        competitor: true,
+        market_competitors: true,
       },
     });
 

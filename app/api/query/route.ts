@@ -71,11 +71,11 @@ export async function POST(request: NextRequest) {
           }))
         },
         include: {
-          subcategory: { include: { category: true } },
-          prices: {
+          market_procedure_subcategories: { include: { market_procedure_categories: true } },
+          market_prices: {
             take: 10,
             orderBy: { crawled_at: 'desc' },
-            include: { competitor: true }
+            include: { market_competitors: true }
           }
         },
         take: 10
@@ -105,10 +105,10 @@ export async function POST(request: NextRequest) {
           }))
         },
         include: {
-          prices: {
+          market_prices: {
             take: 20,
             orderBy: { crawled_at: 'desc' },
-            include: { procedure: true }
+            include: { market_procedures: true }
           }
         },
         take: 20
@@ -125,9 +125,9 @@ export async function POST(request: NextRequest) {
           }))
         },
         include: {
-          subcategories: {
+          market_procedure_subcategories: {
             include: {
-              procedures: {
+              market_procedures: {
                 take: 10
               }
             }
@@ -143,12 +143,12 @@ export async function POST(request: NextRequest) {
         take: 20,
         orderBy: { crawled_at: 'desc' },
         include: {
-          procedure: {
+          market_procedures: {
             include: {
-              subcategory: { include: { category: true } }
+              market_procedure_subcategories: { include: { market_procedure_categories: true } }
             }
           },
-          competitor: true
+          market_competitors: true
         }
       })
       relevantData.recentPrices = recentPrices

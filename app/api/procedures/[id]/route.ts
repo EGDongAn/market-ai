@@ -10,9 +10,9 @@ export async function GET(
     const procedure = await prisma.market_procedures.findUnique({
       where: { id: parseInt(id) },
       include: {
-        subcategory: {
+        market_procedure_subcategories: {
           include: {
-            category: true
+            market_procedure_categories: true
           }
         }
       }
@@ -66,9 +66,9 @@ export async function PUT(
         unit: unit || null
       },
       include: {
-        subcategory: {
+        market_procedure_subcategories: {
           include: {
-            category: true
+            market_procedure_categories: true
           }
         }
       }

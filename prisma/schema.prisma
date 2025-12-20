@@ -8,6 +8,15 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model ai_chat_sessions {
+  id         Int      @id @default(autoincrement())
+  title      String?
+  messages   Json
+  context    Json?
+  created_at DateTime @default(now())
+  updated_at DateTime
+}
+
 model audit_logs {
   id          Int      @id @default(autoincrement())
   user_id     String?
@@ -65,6 +74,97 @@ model contacts {
   updated_at DateTime
   partners   partners @relation(fields: [partner_id], references: [id], onDelete: Cascade)
   items      items[]
+}
+
+model influencer_analyses {
+  id                      Int            @id @default(autoincrement())
+  influencer_id           Int
+  instagram_followers     Int?
+  instagram_engagement    Decimal?       @db.Decimal(5, 2)
+  youtube_subscribers     Int?
+  youtube_avg_views       Int?
+  tiktok_followers        Int?
+  tiktok_engagement       Decimal?       @db.Decimal(5, 2)
+  calculated_tier         InfluencerTier
+  tier_score              Decimal        @db.Decimal(5, 2)
+  analysis_summary        String?
+  analysis_raw            Json?
+  recommended_support_min Decimal?       @db.Decimal(12, 2)
+  recommended_support_max Decimal?       @db.Decimal(12, 2)
+  analyzed_at             DateTime       @default(now())
+  influencers             influencers    @relation(fields: [influencer_id], references: [id], onDelete: Cascade)
+
+  @@index([analyzed_at])
+  @@index([influencer_id])
+}
+
+model influencer_procedure_supports {
+  id                Int                @id @default(autoincrement())
+  influencer_id     Int
+  procedure_id      Int
+  visit_id          Int?
+  procedure_cost    Decimal            @db.Decimal(12, 2)
+  supported_amount  Decimal            @db.Decimal(12, 2)
+  client_payment    Decimal            @db.Decimal(12, 2)
+  status            SupportStatus      @default(SCHEDULED)
+  scheduled_at      DateTime?
+  completed_at      DateTime?
+  notes             String?
+  created_at        DateTime           @default(now())
+  updated_at        DateTime
+  influencers       influencers        @relation(fields: [influencer_id], references: [id], onDelete: Cascade)
+  procedures        procedures         @relation(fields: [procedure_id], references: [id])
+  influencer_visits influencer_visits? @relation(fields: [visit_id], references: [id])
+
+  @@index([influencer_id])
+  @@index([procedure_id])
+  @@index([status])
+}
+
+model influencer_visits {
+  id                            Int                             @id @default(autoincrement())
+  influencer_id                 Int
+  visit_date                    DateTime
+  purpose                       String?
+  content_posted                Boolean                         @default(false)
+  content_urls                  Json?
+  notes                         String?
+  created_at                    DateTime                        @default(now())
+  updated_at                    DateTime
+  influencer_procedure_supports influencer_procedure_supports[]
+  influencers                   influencers                     @relation(fields: [influencer_id], references: [id], onDelete: Cascade)
+
+  @@index([influencer_id])
+  @@index([visit_date])
+}
+
+model influencers {
+  id                            Int                             @id @default(autoincrement())
+  name                          String
+  nickname                      String?
+  email                         String?
+  phone                         String?
+  instagram_handle              String?
+  youtube_channel               String?
+  tiktok_handle                 String?
+  blog_url                      String?
+  current_tier                  InfluencerTier                  @default(C)
+  tier_score                    Decimal?                        @db.Decimal(5, 2)
+  last_analyzed_at              DateTime?
+  total_visits                  Int                             @default(0)
+  total_supported               Decimal                         @default(0) @db.Decimal(12, 2)
+  notes                         String?
+  is_active                     Boolean                         @default(true)
+  is_blacklisted                Boolean                         @default(false)
+  blacklist_reason              String?
+  created_at                    DateTime                        @default(now())
+  updated_at                    DateTime
+  influencer_analyses           influencer_analyses[]
+  influencer_procedure_supports influencer_procedure_supports[]
+  influencer_visits             influencer_visits[]
+
+  @@index([current_tier])
+  @@index([is_active])
 }
 
 model invoice_hashes {
@@ -173,6 +273,7 @@ model items {
   contacts                                           contacts?               @relation(fields: [order_contact_id], references: [id])
   loan_items                                         loan_items[]
   partner_item_mappings                              partner_item_mappings[]
+  procedure_items                                    procedure_items[]
   stock_transactions                                 stock_transactions[]
 }
 
@@ -245,10 +346,42 @@ model manual_categories {
   manuals                 manuals[]
 }
 
+model manual_chunks {
+  id               Int                   @id @default(autoincrement())
+  manual_id        Int
+  chunk_index      Int
+  content          String
+  section_title    String?
+  start_offset     Int
+  end_offset       Int
+  token_count      Int
+  content_hash     String
+  embedding        Bytes
+  embedding_vector Unsupported("vector")
+  created_at       DateTime              @default(now())
+  updated_at       DateTime
+  manuals          manuals               @relation(fields: [manual_id], references: [id], onDelete: Cascade)
+
+  @@unique([manual_id, chunk_index])
+  @@index([content_hash])
+  @@index([manual_id])
+}
+
+model manual_embeddings {
+  id               Int                   @id @default(autoincrement())
+  manual_id        Int                   @unique
+  embedding        Bytes
+  embedding_vector Unsupported("vector")
+  content_hash     String
+  created_at       DateTime              @default(now())
+  updated_at       DateTime
+  manuals          manuals               @relation(fields: [manual_id], references: [id], onDelete: Cascade)
+}
+
 model manual_tags {
   id      Int       @id @default(autoincrement())
   name    String    @unique
-  manuals manuals[] @relation("manual_tagsTomanuals")
+  manuals manuals[]
 }
 
 model manual_versions {
@@ -279,12 +412,192 @@ model manuals {
   created_at         DateTime             @default(now())
   updated_at         DateTime
   manual_attachments manual_attachments[]
+  manual_chunks      manual_chunks[]
+  manual_embeddings  manual_embeddings?
   manual_versions    manual_versions[]
   manual_categories  manual_categories?   @relation(fields: [category_id], references: [id])
-  manual_tags        manual_tags[]        @relation("manual_tagsTomanuals")
+  procedure_manuals  procedure_manuals[]
+  manual_tags        manual_tags[]
 
   @@index([category_id])
   @@index([status])
+}
+
+model market_alert_history {
+  id             Int           @id @default(autoincrement())
+  alert_id       Int
+  triggered_at   DateTime?     @default(now()) @db.Timestamp(6)
+  old_value      Decimal?      @db.Decimal(12, 2)
+  new_value      Decimal?      @db.Decimal(12, 2)
+  change_percent Decimal?      @db.Decimal(5, 2)
+  message        String?
+  is_read        Boolean?      @default(false)
+  market_alerts  market_alerts @relation(fields: [alert_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([alert_id], map: "idx_market_alert_history_alert")
+}
+
+model market_alerts {
+  id                   Int                    @id @default(autoincrement())
+  alert_type           String                 @db.VarChar(50)
+  procedure_id         Int?
+  competitor_id        Int?
+  threshold_percent    Decimal?               @db.Decimal(5, 2)
+  threshold_value      Decimal?               @db.Decimal(12, 2)
+  is_active            Boolean?               @default(true)
+  email_notify         Boolean?               @default(true)
+  push_notify          Boolean?               @default(false)
+  created_at           DateTime?              @default(now()) @db.Timestamp(6)
+  updated_at           DateTime?              @default(now()) @db.Timestamp(6)
+  market_alert_history market_alert_history[]
+  market_competitors   market_competitors?    @relation(fields: [competitor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  market_procedures    market_procedures?     @relation(fields: [procedure_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model market_competitors {
+  id                   Int                    @id @default(autoincrement())
+  name                 String                 @unique @db.VarChar(255)
+  website              String?
+  region               String?                @db.VarChar(100)
+  type                 String?                @db.VarChar(50)
+  is_active            Boolean?               @default(true)
+  crawl_priority       Int?                   @default(5)
+  crawl_config         Json?
+  last_crawled_at      DateTime?              @db.Timestamp(6)
+  created_at           DateTime?              @default(now()) @db.Timestamp(6)
+  updated_at           DateTime?              @default(now()) @db.Timestamp(6)
+  market_alerts        market_alerts[]
+  market_crawl_configs market_crawl_configs[]
+  market_prices        market_prices[]
+}
+
+model market_crawl_configs {
+  id                 Int                @id @default(autoincrement())
+  competitor_id      Int
+  config_type        String             @db.VarChar(50)
+  selectors          Json?
+  schedule           String?            @db.VarChar(100)
+  is_active          Boolean?           @default(true)
+  last_run_at        DateTime?          @db.Timestamp(6)
+  last_run_status    String?            @db.VarChar(20)
+  created_at         DateTime?          @default(now()) @db.Timestamp(6)
+  updated_at         DateTime?          @default(now()) @db.Timestamp(6)
+  market_competitors market_competitors @relation(fields: [competitor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model market_our_prices {
+  id                Int               @id @default(autoincrement())
+  procedure_id      Int
+  regular_price     Decimal?          @db.Decimal(12, 2)
+  event_price       Decimal?          @db.Decimal(12, 2)
+  cost_price        Decimal?          @db.Decimal(12, 2)
+  target_margin     Decimal?          @db.Decimal(5, 2)
+  is_active         Boolean?          @default(true)
+  valid_from        DateTime?         @db.Timestamp(6)
+  valid_until       DateTime?         @db.Timestamp(6)
+  created_at        DateTime?         @default(now()) @db.Timestamp(6)
+  updated_at        DateTime?         @default(now()) @db.Timestamp(6)
+  market_procedures market_procedures @relation(fields: [procedure_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model market_package_items {
+  id                Int               @id @default(autoincrement())
+  package_id        Int
+  procedure_id      Int
+  quantity          Int?              @default(1)
+  discount_percent  Decimal?          @default(0) @db.Decimal(5, 2)
+  created_at        DateTime?         @default(now()) @db.Timestamp(6)
+  market_packages   market_packages   @relation(fields: [package_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  market_procedures market_procedures @relation(fields: [procedure_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model market_packages {
+  id                   Int                    @id @default(autoincrement())
+  name                 String                 @db.VarChar(255)
+  description          String?
+  regular_price        Decimal?               @db.Decimal(12, 2)
+  package_price        Decimal?               @db.Decimal(12, 2)
+  is_ai_suggested      Boolean?               @default(false)
+  ai_rationale         String?
+  is_active            Boolean?               @default(true)
+  created_at           DateTime?              @default(now()) @db.Timestamp(6)
+  updated_at           DateTime?              @default(now()) @db.Timestamp(6)
+  market_package_items market_package_items[]
+}
+
+model market_prices {
+  id                 Int                @id @default(autoincrement())
+  competitor_id      Int
+  procedure_id       Int
+  regular_price      Decimal?           @db.Decimal(12, 2)
+  event_price        Decimal?           @db.Decimal(12, 2)
+  unit_count         Int?               @default(1)
+  source_url         String?
+  crawled_at         DateTime?          @default(now()) @db.Timestamp(6)
+  created_at         DateTime?          @default(now()) @db.Timestamp(6)
+  market_competitors market_competitors @relation(fields: [competitor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  market_procedures  market_procedures  @relation(fields: [procedure_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([competitor_id], map: "idx_market_prices_competitor")
+  @@index([crawled_at], map: "idx_market_prices_crawled_at")
+  @@index([procedure_id], map: "idx_market_prices_procedure")
+}
+
+model market_procedure_categories {
+  id                             Int                              @id @default(autoincrement())
+  name                           String                           @unique @db.VarChar(100)
+  description                    String?
+  sort_order                     Int?                             @default(0)
+  is_active                      Boolean?                         @default(true)
+  created_at                     DateTime?                        @default(now()) @db.Timestamp(6)
+  updated_at                     DateTime?                        @default(now()) @db.Timestamp(6)
+  market_procedure_subcategories market_procedure_subcategories[]
+}
+
+model market_procedure_embeddings {
+  id                Int               @id @default(autoincrement())
+  procedure_id      Int               @unique
+  embedding         Json
+  content           String?
+  created_at        DateTime?         @default(now()) @db.Timestamp(6)
+  updated_at        DateTime?         @default(now()) @db.Timestamp(6)
+  market_procedures market_procedures @relation(fields: [procedure_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model market_procedure_subcategories {
+  id                          Int                         @id @default(autoincrement())
+  category_id                 Int
+  name                        String                      @db.VarChar(100)
+  description                 String?
+  sort_order                  Int?                        @default(0)
+  is_active                   Boolean?                    @default(true)
+  created_at                  DateTime?                   @default(now()) @db.Timestamp(6)
+  updated_at                  DateTime?                   @default(now()) @db.Timestamp(6)
+  market_procedure_categories market_procedure_categories @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  market_procedures           market_procedures[]
+
+  @@unique([category_id, name])
+}
+
+model market_procedures {
+  id                             Int                             @id @default(autoincrement())
+  name                           String                          @db.VarChar(255)
+  subcategory_id                 Int?
+  aliases                        String[]
+  brand                          String?                         @db.VarChar(100)
+  unit                           String?                         @db.VarChar(50)
+  description                    String?
+  is_active                      Boolean?                        @default(true)
+  created_at                     DateTime?                       @default(now()) @db.Timestamp(6)
+  updated_at                     DateTime?                       @default(now()) @db.Timestamp(6)
+  market_alerts                  market_alerts[]
+  market_our_prices              market_our_prices[]
+  market_package_items           market_package_items[]
+  market_prices                  market_prices[]
+  market_procedure_embeddings    market_procedure_embeddings?
+  market_procedure_subcategories market_procedure_subcategories? @relation(fields: [subcategory_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([subcategory_id], map: "idx_market_procedures_subcategory")
 }
 
 model partner_item_mappings {
@@ -324,6 +637,79 @@ model partners {
   stock_transactions    stock_transactions[]
 }
 
+model procedure_costs {
+  id           Int        @id @default(autoincrement())
+  procedure_id Int
+  cost_type    CostType
+  name         String
+  amount       Decimal    @db.Decimal(12, 2)
+  unit         String?
+  calculation  String?
+  created_at   DateTime   @default(now())
+  updated_at   DateTime
+  procedures   procedures @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
+
+  @@index([procedure_id])
+}
+
+model procedure_equipment {
+  id             Int        @id @default(autoincrement())
+  procedure_id   Int
+  equipment_name String
+  usage_minutes  Int?
+  procedures     procedures @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
+
+  @@index([procedure_id])
+}
+
+model procedure_items {
+  id           Int        @id @default(autoincrement())
+  procedure_id Int
+  item_id      Int
+  quantity     Decimal    @db.Decimal(10, 4)
+  unit         String
+  is_optional  Boolean    @default(false)
+  items        items      @relation(fields: [item_id], references: [id])
+  procedures   procedures @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
+
+  @@unique([procedure_id, item_id])
+}
+
+model procedure_manuals {
+  id            Int        @id @default(autoincrement())
+  procedure_id  Int
+  manual_id     Int
+  relation_type String
+  manuals       manuals    @relation(fields: [manual_id], references: [id], onDelete: Cascade)
+  procedures    procedures @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
+
+  @@unique([procedure_id, manual_id])
+}
+
+model procedures {
+  id                            Int                             @id @default(autoincrement())
+  name                          String
+  name_en                       String?
+  category                      String
+  subcategory                   String?
+  description                   String?
+  duration_minutes              Int
+  buffer_minutes                Int                             @default(10)
+  base_cost                     Decimal                         @db.Decimal(12, 2)
+  is_active                     Boolean                         @default(true)
+  requires_doctor               Boolean                         @default(true)
+  created_at                    DateTime                        @default(now())
+  updated_at                    DateTime
+  influencer_procedure_supports influencer_procedure_supports[]
+  procedure_costs               procedure_costs[]
+  procedure_equipment           procedure_equipment[]
+  procedure_items               procedure_items[]
+  procedure_manuals             procedure_manuals[]
+
+  @@index([category])
+  @@index([is_active])
+}
+
 model roles {
   id          Int      @id @default(autoincrement())
   name        String   @unique
@@ -352,6 +738,21 @@ model stock_transactions {
   locations_stock_transactions_to_location_idTolocations   locations?  @relation("stock_transactions_to_location_idTolocations", fields: [to_location_id], references: [id])
 }
 
+model tier_support_policies {
+  id                    Int            @id @default(autoincrement())
+  tier                  InfluencerTier @unique
+  max_support_per_visit Decimal        @db.Decimal(12, 2)
+  max_support_per_month Decimal        @db.Decimal(12, 2)
+  max_visits_per_month  Int            @default(1)
+  support_rate_percent  Int
+  allowed_categories    Json?
+  excluded_procedures   Json?
+  additional_benefits   Json?
+  is_active             Boolean        @default(true)
+  created_at            DateTime       @default(now())
+  updated_at            DateTime
+}
+
 model users {
   id                 String               @id
   email              String               @unique
@@ -361,119 +762,6 @@ model users {
   audit_logs         audit_logs[]
   stock_transactions stock_transactions[]
   roles              roles?               @relation(fields: [role_id], references: [id])
-}
-
-model campaigns {
-  id             Int              @id @default(autoincrement())
-  name           String
-  description    String?
-  client_name    String
-  client_contact String?
-  start_date     DateTime
-  end_date       DateTime?
-  type           CampaignType     @default(COLLABORATION)
-  budget         Decimal?         @db.Decimal(12, 0)
-  status         CampaignStatus   @default(PLANNING)
-  notes          String?
-  created_at     DateTime         @default(now())
-  updated_at     DateTime
-  collaborations collaborations[]
-}
-
-model collaborations {
-  id              Int                 @id @default(autoincrement())
-  campaign_id     Int
-  influencer_id   Int
-  fee             Decimal?            @db.Decimal(12, 0)
-  fee_type        FeeType             @default(FIXED)
-  shooting_date   DateTime?
-  progress_date   DateTime?
-  upload_deadline DateTime?
-  status          CollaborationStatus @default(CONTACTED)
-  notes           String?
-  created_at      DateTime            @default(now())
-  updated_at      DateTime
-  campaigns       campaigns           @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
-  influencers     influencers         @relation(fields: [influencer_id], references: [id], onDelete: Cascade)
-  inf_contents    inf_contents[]
-
-  @@unique([campaign_id, influencer_id])
-}
-
-model inf_channels {
-  id             Int            @id @default(autoincrement())
-  influencer_id  Int
-  platform       InfPlatform
-  handle         String
-  url            String?
-  follower_count Int?
-  created_at     DateTime       @default(now())
-  updated_at     DateTime
-  influencers    influencers    @relation(fields: [influencer_id], references: [id], onDelete: Cascade)
-  inf_contents   inf_contents[]
-}
-
-model inf_contents {
-  id                 Int            @id @default(autoincrement())
-  collaboration_id   Int
-  channel_id         Int
-  title              String?
-  url                String
-  content_type       ContentType    @default(VIDEO)
-  uploaded_at        DateTime?
-  views              Int            @default(0)
-  likes              Int            @default(0)
-  comments           Int            @default(0)
-  shares             Int            @default(0)
-  metrics_updated_at DateTime?
-  notes              String?
-  created_at         DateTime       @default(now())
-  updated_at         DateTime
-  inf_channels       inf_channels   @relation(fields: [channel_id], references: [id], onDelete: Cascade)
-  collaborations     collaborations @relation(fields: [collaboration_id], references: [id], onDelete: Cascade)
-}
-
-model influencers {
-  id                Int              @id @default(autoincrement())
-  name              String
-  nickname          String?
-  email             String?
-  phone             String?
-  profile_image_url String?
-  tier              InfluencerTier   @default(SILVER)
-  category          String[]
-  notes             String?
-  is_active         Boolean          @default(true)
-  created_at        DateTime         @default(now())
-  updated_at        DateTime
-  collaborations    collaborations[]
-  inf_channels      inf_channels[]
-}
-
-enum LoanDirection {
-  OUT
-  IN
-}
-
-enum LoanStatus {
-  ONGOING
-  RETURNED
-  OVERDUE
-}
-
-enum ManualStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
-}
-
-enum StockTxType {
-  IN
-  OUT
-  ADJUST
-  LOAN_OUT
-  LOAN_IN
-  TRANSFER
 }
 
 enum CampaignStatus {
@@ -511,6 +799,14 @@ enum ContentType {
   OTHER_CONTENT
 }
 
+enum CostType {
+  LABOR
+  RENT
+  MATERIAL
+  EQUIPMENT
+  OTHER
+}
+
 enum FeeType {
   FIXED
   PER_CONTENT
@@ -530,198 +826,42 @@ enum InfPlatform {
 }
 
 enum InfluencerTier {
-  VIP
-  GOLD
-  SILVER
-  BRONZE
+  SS
+  S
+  A
+  B
+  C
 }
 
-// ============================================
-// Market AI Tables (market-ai)
-// ============================================
-
-model market_competitors {
-  id             Int                     @id @default(autoincrement())
-  name           String                  @unique
-  website        String?
-  region         String?
-  type           String?
-  is_active      Boolean                 @default(true)
-  crawl_priority Int                     @default(5)
-  created_at     DateTime                @default(now())
-  updated_at     DateTime                @updatedAt
-  prices         market_prices[]
-  crawl_configs  market_crawl_configs[]
+enum LoanDirection {
+  OUT
+  IN
 }
 
-model market_procedure_categories {
-  id            Int                             @id @default(autoincrement())
-  name          String                          @unique
-  created_at    DateTime                        @default(now())
-  subcategories market_procedure_subcategories[]
+enum LoanStatus {
+  ONGOING
+  RETURNED
+  OVERDUE
 }
 
-model market_procedure_subcategories {
-  id          Int                         @id @default(autoincrement())
-  category_id Int
-  category    market_procedure_categories @relation(fields: [category_id], references: [id], onDelete: Cascade)
-  name        String
-  created_at  DateTime                    @default(now())
-  procedures  market_procedures[]
+enum ManualStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
 }
 
-model market_procedures {
-  id             Int                            @id @default(autoincrement())
-  subcategory_id Int
-  subcategory    market_procedure_subcategories @relation(fields: [subcategory_id], references: [id], onDelete: Cascade)
-  name           String
-  aliases        Json?
-  brand          String?
-  unit           String?
-  created_at     DateTime                       @default(now())
-  updated_at     DateTime                       @updatedAt
-  prices         market_prices[]
-  our_prices     market_our_prices[]
-  package_items  market_package_procedures[]
-  trends         market_procedure_trends[]
-  embedding      market_procedure_embeddings?
+enum StockTxType {
+  IN
+  OUT
+  ADJUST
+  LOAN_OUT
+  LOAN_IN
+  TRANSFER
 }
 
-model market_procedure_embeddings {
-  id            Int               @id @default(autoincrement())
-  procedure_id  Int               @unique
-  procedure     market_procedures @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
-  embedding     Json              // Array of 768 floats stored as JSON
-  content       String
-  created_at    DateTime          @default(now())
-  updated_at    DateTime          @updatedAt
-}
-
-model market_prices {
-  id            Int                @id @default(autoincrement())
-  competitor_id Int
-  competitor    market_competitors @relation(fields: [competitor_id], references: [id], onDelete: Cascade)
-  procedure_id  Int
-  procedure     market_procedures  @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
-  regular_price Decimal?           @db.Decimal(12, 0)
-  event_price   Decimal?           @db.Decimal(12, 0)
-  source_url    String?
-  source_type   String?
-  crawled_at    DateTime
-  created_at    DateTime           @default(now())
-}
-
-model market_our_prices {
-  id            Int               @id @default(autoincrement())
-  procedure_id  Int
-  procedure     market_procedures @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
-  regular_price Decimal           @db.Decimal(12, 0)
-  event_price   Decimal?          @db.Decimal(12, 0)
-  cost_price    Decimal?          @db.Decimal(12, 0)
-  valid_from    DateTime          @db.Date
-  valid_to      DateTime?         @db.Date
-  is_active     Boolean           @default(true)
-  created_at    DateTime          @default(now())
-  updated_at    DateTime          @updatedAt
-}
-
-model market_price_history {
-  id             Int      @id @default(autoincrement())
-  competitor_id  Int?
-  procedure_id   Int
-  price_type     String
-  old_price      Decimal? @db.Decimal(12, 0)
-  new_price      Decimal  @db.Decimal(12, 0)
-  change_percent Float?
-  changed_at     DateTime
-}
-
-model market_packages {
-  id            Int                         @id @default(autoincrement())
-  name          String
-  description   String?
-  total_price   Decimal                     @db.Decimal(12, 0)
-  discount_rate Float?
-  source        String                      @default("AI")
-  ai_rationale  String?
-  is_active     Boolean                     @default(true)
-  created_at    DateTime                    @default(now())
-  updated_at    DateTime                    @updatedAt
-  procedures    market_package_procedures[]
-}
-
-model market_package_procedures {
-  id           Int               @id @default(autoincrement())
-  package_id   Int
-  package      market_packages   @relation(fields: [package_id], references: [id], onDelete: Cascade)
-  procedure_id Int
-  procedure    market_procedures @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
-  quantity     Int               @default(1)
-  unit_price   Decimal           @db.Decimal(12, 0)
-}
-
-model market_crawl_configs {
-  id              Int                @id @default(autoincrement())
-  competitor_id   Int
-  competitor      market_competitors @relation(fields: [competitor_id], references: [id], onDelete: Cascade)
-  crawl_type      String
-  target_url      String
-  schedule        String?
-  frequency       String             @default("DAILY")
-  is_active       Boolean            @default(true)
-  last_crawled_at DateTime?
-  created_at      DateTime           @default(now())
-}
-
-model market_crawl_logs {
-  id            Int       @id @default(autoincrement())
-  competitor_id Int?
-  status        String
-  target_url    String
-  items_found   Int       @default(0)
-  items_updated Int       @default(0)
-  error_message String?
-  duration      Int?
-  started_at    DateTime
-  completed_at  DateTime?
-}
-
-model market_alerts {
-  id             Int                          @id @default(autoincrement())
-  name           String
-  alert_type     String
-  competitor_id  Int?
-  procedure_id   Int?
-  threshold      Float?
-  threshold_type String?
-  notify_email   String?
-  is_active      Boolean                      @default(true)
-  created_at     DateTime                     @default(now())
-  notifications  market_alert_notifications[]
-}
-
-model market_alert_notifications {
-  id       Int           @id @default(autoincrement())
-  alert_id Int
-  alert    market_alerts @relation(fields: [alert_id], references: [id], onDelete: Cascade)
-  title    String
-  message  String
-  data     Json?
-  is_read  Boolean       @default(false)
-  sent_at  DateTime      @default(now())
-}
-
-model market_procedure_trends {
-  id               Int               @id @default(autoincrement())
-  procedure_id     Int
-  procedure        market_procedures @relation(fields: [procedure_id], references: [id], onDelete: Cascade)
-  period           String
-  period_date      DateTime          @db.Date
-  avg_price        Decimal?          @db.Decimal(12, 0)
-  min_price        Decimal?          @db.Decimal(12, 0)
-  max_price        Decimal?          @db.Decimal(12, 0)
-  price_change     Float?
-  competitor_count Int?
-
-  @@unique([procedure_id, period, period_date])
+enum SupportStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
 }

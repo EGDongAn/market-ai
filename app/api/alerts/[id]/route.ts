@@ -35,27 +35,42 @@ export async function PATCH(
     const body = await request.json()
 
     const {
-      name,
       alert_type,
       competitor_id,
       procedure_id,
-      threshold,
-      threshold_type,
-      notify_email,
+      threshold_percent,
+      threshold_value,
+      email_notify,
+      push_notify,
       is_active,
     } = body
 
     const updateData: Prisma.market_alertsUpdateInput = {}
 
-    if (name !== undefined) updateData.name = name
     if (alert_type !== undefined) updateData.alert_type = alert_type
-    if (competitor_id !== undefined) updateData.competitor_id = competitor_id || null
-    if (procedure_id !== undefined) updateData.procedure_id = procedure_id || null
-    if (threshold !== undefined)
-      updateData.threshold = threshold ? parseFloat(threshold) : null
-    if (threshold_type !== undefined) updateData.threshold_type = threshold_type || null
-    if (notify_email !== undefined) updateData.notify_email = notify_email || null
+    if (threshold_percent !== undefined)
+      updateData.threshold_percent = threshold_percent ? parseFloat(threshold_percent) : null
+    if (threshold_value !== undefined)
+      updateData.threshold_value = threshold_value ? parseFloat(threshold_value) : null
+    if (email_notify !== undefined) updateData.email_notify = email_notify
+    if (push_notify !== undefined) updateData.push_notify = push_notify
     if (is_active !== undefined) updateData.is_active = is_active
+
+    // Handle relations
+    if (competitor_id !== undefined) {
+      if (competitor_id) {
+        updateData.market_competitors = { connect: { id: competitor_id } }
+      } else {
+        updateData.market_competitors = { disconnect: true }
+      }
+    }
+    if (procedure_id !== undefined) {
+      if (procedure_id) {
+        updateData.market_procedures = { connect: { id: procedure_id } }
+      } else {
+        updateData.market_procedures = { disconnect: true }
+      }
+    }
 
     const alert = await prisma.market_alerts.update({
       where: { id: alertId },

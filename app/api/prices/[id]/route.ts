@@ -19,7 +19,7 @@ export async function GET(
     const price = await prisma.market_prices.findUnique({
       where: { id },
       include: {
-        competitor: {
+        market_competitors: {
           select: {
             id: true,
             name: true,
@@ -28,18 +28,18 @@ export async function GET(
             type: true,
           }
         },
-        procedure: {
+        market_procedures: {
           select: {
             id: true,
             name: true,
             brand: true,
             unit: true,
             aliases: true,
-            subcategory: {
+            market_procedure_subcategories: {
               select: {
                 id: true,
                 name: true,
-                category: {
+                market_procedure_categories: {
                   select: {
                     id: true,
                     name: true,
@@ -109,12 +109,11 @@ export async function PUT(
         regular_price: regular_price !== undefined ? parseFloat(regular_price) : undefined,
         event_price: event_price !== undefined ? parseFloat(event_price) : undefined,
         source_url,
-        source_type,
         crawled_at: new Date(),
       },
       include: {
-        competitor: true,
-        procedure: true,
+        market_competitors: true,
+        market_procedures: true,
       }
     })
 
@@ -157,11 +156,12 @@ export async function PUT(
       })
     }
 
-    if (priceChanges.length > 0) {
-      await prisma.market_price_history.createMany({
-        data: priceChanges
-      })
-    }
+    // TODO: Implement price history tracking when market_price_history table is created
+    // if (priceChanges.length > 0) {
+    //   await prisma.market_price_history.createMany({
+    //     data: priceChanges
+    //   })
+    // }
 
     return NextResponse.json({
       success: true,

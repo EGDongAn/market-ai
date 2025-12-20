@@ -15,11 +15,11 @@ export async function GET() {
       prisma.market_alerts.count(),
     ]);
 
-    // Get last crawl time
-    const lastCrawl = await prisma.market_crawl_logs.findFirst({
-      where: { status: 'SUCCESS' },
-      orderBy: { completed_at: 'desc' },
-      select: { completed_at: true },
+    // Get last crawl time from crawl configs
+    const lastCrawl = await prisma.market_crawl_configs.findFirst({
+      where: { last_run_status: 'SUCCESS' },
+      orderBy: { last_run_at: 'desc' },
+      select: { last_run_at: true },
     });
 
     return NextResponse.json({
@@ -27,7 +27,7 @@ export async function GET() {
       procedureCount,
       priceCount,
       alertCount,
-      lastCrawlAt: lastCrawl?.completed_at,
+      lastCrawlAt: lastCrawl?.last_run_at,
     });
   } catch (error) {
     console.error('Failed to fetch stats:', error);

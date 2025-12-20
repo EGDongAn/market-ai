@@ -32,19 +32,19 @@ export async function POST(request: NextRequest) {
       procedures = await prisma.market_procedures.findMany({
         where: { id: { in: procedureIds } },
         include: {
-          subcategory: { include: { category: true } },
-          our_prices: { where: { is_active: true }, take: 1 }
+          market_procedure_subcategories: { include: { market_procedure_categories: true } },
+          market_our_prices: { where: { is_active: true }, take: 1 }
         }
       });
     } else {
       // Get procedures with active prices
       procedures = await prisma.market_procedures.findMany({
         where: {
-          our_prices: { some: { is_active: true } }
+          market_our_prices: { some: { is_active: true } }
         },
         include: {
-          subcategory: { include: { category: true } },
-          our_prices: { where: { is_active: true }, take: 1 }
+          market_procedure_subcategories: { include: { market_procedure_categories: true } },
+          market_our_prices: { where: { is_active: true }, take: 1 }
         },
         take: procedureCount * 3
       });
@@ -87,8 +87,8 @@ export async function POST(request: NextRequest) {
       const prompt = packageSuggestionPrompt
         .replace('{{procedures}}', JSON.stringify(packageProcedures.map(p => ({
           name: p.name,
-          category: p.subcategory.category.name,
-          price: p.our_prices[0]?.regular_price?.toString()
+          category: p.market_procedure_subcategories?.market_procedure_categories?.name || '기타',
+          price: p.market_our_prices[0]?.regular_price?.toString()
         }))))
         .replace('{{competitorPrices}}', JSON.stringify(
           packageProcedures.map(p => ({
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
         const aiSuggestion = await generateJSON<PackageSuggestion>(prompt);
 
         const totalPrice = packageProcedures.reduce((sum, p) =>
-          sum + (p.our_prices[0]?.regular_price?.toNumber() || 0), 0
+          sum + (p.market_our_prices[0]?.regular_price?.toNumber() || 0), 0
         );
 
         suggestions.push({
@@ -116,11 +116,11 @@ export async function POST(request: NextRequest) {
         console.error('AI suggestion failed:', err);
         // Fallback to simple suggestion
         const totalPrice = packageProcedures.reduce((sum, p) =>
-          sum + (p.our_prices[0]?.regular_price?.toNumber() || 0), 0
+          sum + (p.market_our_prices[0]?.regular_price?.toNumber() || 0), 0
         );
         suggestions.push({
-          name: `${packageProcedures[0].subcategory.category.name} 스페셜`,
-          description: `인기 ${packageProcedures[0].subcategory.category.name} 시술 패키지`,
+          name: `${packageProcedures[0].market_procedure_subcategories?.market_procedure_categories?.name || '기타'} 스페셜`,
+          description: `인기 ${packageProcedures[0].market_procedure_subcategories?.market_procedure_categories?.name || '기타'} 시술 패키지`,
           procedures: packageProcedures,
           rationale: '인기 시술 조합으로 구성된 패키지입니다.',
           discountRate: 15,

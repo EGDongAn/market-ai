@@ -43,49 +43,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const history = await prisma.market_price_history.findMany({
-      where,
-      orderBy: {
-        changed_at: 'desc'
-      },
-      take: limit ? parseInt(limit) : 100,
-    })
-
-    // Enrich with competitor and procedure names
-    const enrichedHistory = await Promise.all(
-      history.map(async (record) => {
-        const competitor = record.competitor_id
-          ? await prisma.market_competitors.findUnique({
-              where: { id: record.competitor_id },
-              select: { name: true, region: true }
-            })
-          : null
-
-        const procedure = await prisma.market_procedures.findUnique({
-          where: { id: record.procedure_id },
-          select: {
-            name: true,
-            brand: true,
-            subcategory: {
-              select: {
-                name: true,
-                category: {
-                  select: {
-                    name: true
-                  }
-                }
-              }
-            }
-          }
-        })
-
-        return {
-          ...record,
-          competitor,
-          procedure,
-        }
-      })
-    )
+    // TODO: Implement when market_price_history table is created
+    // Price history table doesn't exist yet
+    const enrichedHistory: never[] = []
 
     return NextResponse.json({
       success: true,

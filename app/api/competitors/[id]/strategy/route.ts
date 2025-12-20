@@ -44,9 +44,13 @@ export async function GET(
         crawled_at: { gte: ninetyDaysAgo }
       },
       include: {
-        procedure: {
+        market_procedures: {
           include: {
-            subcategory: { include: { category: true } }
+            market_procedure_subcategories: {
+              include: {
+                market_procedure_categories: true
+              }
+            }
           }
         }
       },
@@ -59,9 +63,13 @@ export async function GET(
         crawled_at: { gte: ninetyDaysAgo }
       },
       include: {
-        procedure: {
+        market_procedures: {
           include: {
-            subcategory: { include: { category: true } }
+            market_procedure_subcategories: {
+              include: {
+                market_procedure_categories: true
+              }
+            }
           }
         }
       }
@@ -103,7 +111,7 @@ export async function GET(
         const diff = ((competitorPrice - marketAvg) / marketAvg) * 100
         priceComparisons.push(diff)
 
-        const categoryName = price.procedure?.subcategory?.category?.name || '기타'
+        const categoryName = price.market_procedures?.market_procedure_subcategories?.market_procedure_categories?.name || '기타'
         if (!categoryPrices.has(categoryName)) {
           categoryPrices.set(categoryName, { competitor: [], market: [] })
         }

@@ -44,8 +44,8 @@ export async function POST(request: NextRequest) {
       where: whereClause,
       orderBy: { crawled_at: 'asc' },
       include: {
-        procedure: true,
-        competitor: true
+        market_procedures: true,
+        market_competitors: true
       }
     })
 
@@ -58,10 +58,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 가격 데이터 변환
-    const priceData = priceHistory.map(p => ({
-      date: p.crawled_at,
-      price: p.event_price?.toNumber() || p.regular_price?.toNumber() || 0
-    })).filter(p => p.price > 0)
+    const priceData = priceHistory
+      .map(p => ({
+        date: p.crawled_at!,
+        price: p.event_price?.toNumber() || p.regular_price?.toNumber() || 0
+      }))
+      .filter(p => p.price > 0 && p.date !== null)
 
     // 예측 생성
     const forecast = generateForecast(priceData, forecastDays)
@@ -74,8 +76,8 @@ export async function POST(request: NextRequest) {
     try {
       const prompt = `가격 예측 분석 결과를 바탕으로 인사이트를 제공해주세요.
 
-시술: ${priceHistory[0]?.procedure?.name || '알 수 없음'}
-${competitor_id ? `경쟁사: ${priceHistory[0]?.competitor?.name || '알 수 없음'}` : '전체 시장'}
+시술: ${priceHistory[0]?.market_procedures?.name || '알 수 없음'}
+${competitor_id ? `경쟁사: ${priceHistory[0]?.market_competitors?.name || '알 수 없음'}` : '전체 시장'}
 현재 가격 트렌드: ${forecast.trend === 'up' ? '상승' : forecast.trend === 'down' ? '하락' : '안정'}
 트렌드 강도: ${Math.round(forecast.trendStrength * 100)}%
 가격 전략: ${strategy === 'aggressive' ? '공격적' : strategy === 'premium' ? '프리미엄' : strategy === 'variable' ? '변동적' : '안정적'}
@@ -101,8 +103,8 @@ ${competitor_id ? `경쟁사: ${priceHistory[0]?.competitor?.name || '알 수 �
       success: true,
       procedureId: procedure_id,
       competitorId: competitor_id || null,
-      procedureName: priceHistory[0]?.procedure?.name,
-      competitorName: competitor_id ? priceHistory[0]?.competitor?.name : '전체 시장',
+      procedureName: priceHistory[0]?.market_procedures?.name,
+      competitorName: competitor_id ? priceHistory[0]?.market_competitors?.name : '전체 시장',
       dataPoints: priceData.length,
       forecast: {
         predictions: forecast.predictions,

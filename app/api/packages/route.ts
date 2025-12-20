@@ -6,9 +6,9 @@ export async function GET() {
   try {
     const packages = await prisma.market_packages.findMany({
       include: {
-        procedures: {
+        market_package_items: {
           include: {
-            procedure: true,
+            market_procedures: true,
           },
         },
       },
@@ -31,10 +31,10 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, description, total_price, discount_rate, source, ai_rationale, is_active, procedures } = body;
+    const { name, description, package_price, regular_price, is_ai_suggested, ai_rationale, is_active, procedures } = body;
 
     // Validate required fields
-    if (!name || !total_price || !procedures || procedures.length === 0) {
+    if (!name || !package_price || !procedures || procedures.length === 0) {
       return NextResponse.json(
         { error: '필수 항목을 모두 입력해주세요.' },
         { status: 400 }
@@ -46,23 +46,23 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         description,
-        total_price,
-        discount_rate: discount_rate || null,
-        source: source || 'Manual',
+        package_price,
+        regular_price: regular_price || null,
+        is_ai_suggested: is_ai_suggested || false,
         ai_rationale: ai_rationale || null,
         is_active: is_active !== undefined ? is_active : true,
-        procedures: {
-          create: procedures.map((proc: { procedure_id: number; quantity?: number; unit_price: number }) => ({
+        market_package_items: {
+          create: procedures.map((proc: { procedure_id: number; quantity?: number; discount_percent?: number }) => ({
             procedure_id: proc.procedure_id,
             quantity: proc.quantity || 1,
-            unit_price: proc.unit_price,
+            discount_percent: proc.discount_percent || 0,
           })),
         },
       },
       include: {
-        procedures: {
+        market_package_items: {
           include: {
-            procedure: true,
+            market_procedures: true,
           },
         },
       },

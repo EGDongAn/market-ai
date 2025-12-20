@@ -33,12 +33,12 @@ export async function GET() {
         crawled_at: { gte: oneWeekAgo }
       },
       include: {
-        procedure: {
+        market_procedures: {
           include: {
-            subcategory: { include: { category: true } }
+            market_procedure_subcategories: { include: { market_procedure_categories: true } }
           }
         },
-        competitor: true
+        market_competitors: true
       },
       orderBy: { crawled_at: 'desc' }
     })
@@ -52,8 +52,8 @@ export async function GET() {
         }
       },
       include: {
-        procedure: true,
-        competitor: true
+        market_procedures: true,
+        market_competitors: true
       }
     })
 
@@ -84,8 +84,8 @@ export async function GET() {
 
         if (Math.abs(changePercent) >= 3) {
           priceChanges.push({
-            procedureName: price.procedure?.name || '알 수 없음',
-            competitorName: price.competitor?.name || '알 수 없음',
+            procedureName: price.market_procedures?.name || '알 수 없음',
+            competitorName: price.market_competitors?.name || '알 수 없음',
             changePercent: Math.round(changePercent * 10) / 10,
             direction: changePercent > 0 ? 'up' : 'down',
             newPrice: currentPrice,
@@ -102,7 +102,7 @@ export async function GET() {
     // 카테고리별 트렌드
     const categoryTrends = new Map<string, number[]>()
     for (const price of thisWeekPrices) {
-      const categoryName = price.procedure?.subcategory?.category?.name || '기타'
+      const categoryName = price.market_procedures?.market_procedure_subcategories?.market_procedure_categories?.name || '기타'
       const priceValue = price.event_price?.toNumber() || price.regular_price?.toNumber() || 0
 
       if (priceValue > 0) {

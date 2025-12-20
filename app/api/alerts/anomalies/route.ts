@@ -33,8 +33,8 @@ export async function POST() {
         crawled_at: { gte: thirtyDaysAgo }
       },
       include: {
-        procedure: true,
-        competitor: true
+        market_procedures: true,
+        market_competitors: true
       },
       orderBy: { crawled_at: 'desc' }
     })
@@ -71,9 +71,9 @@ export async function POST() {
 
         anomalies.push({
           procedureId: prices[0].procedure_id,
-          procedureName: prices[0].procedure?.name || '알 수 없음',
+          procedureName: prices[0].market_procedures?.name || '알 수 없음',
           competitorId: prices[0].competitor_id,
-          competitorName: prices[0].competitor?.name || '알 수 없음',
+          competitorName: prices[0].market_competitors?.name || '알 수 없음',
           currentPrice: latestPrice,
           averagePrice: Math.round(stats.mean),
           zScore: result.zScore,

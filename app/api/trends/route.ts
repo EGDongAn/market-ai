@@ -17,37 +17,37 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 트렌드 데이터 조회
-    const trends = await prisma.market_procedure_trends.findMany({
-      where: {
-        procedure_id: parseInt(procedureId),
-        period: period as 'DAILY' | 'WEEKLY' | 'MONTHLY',
-        ...(startDate &&
-          endDate && {
-            period_date: {
-              gte: new Date(startDate),
-              lte: new Date(endDate),
-            },
-          }),
-      },
-      orderBy: {
-        period_date: 'asc',
-      },
-    });
-
-    // 차트용 데이터로 변환
-    const formattedTrends = formatTrendData(
-      trends.map((t) => ({
-        procedure_id: t.procedure_id,
-        period: t.period as 'DAILY' | 'WEEKLY' | 'MONTHLY',
-        period_date: t.period_date,
-        avg_price: t.avg_price ? Number(t.avg_price) : null,
-        min_price: t.min_price ? Number(t.min_price) : null,
-        max_price: t.max_price ? Number(t.max_price) : null,
-        price_change: t.price_change,
-        competitor_count: t.competitor_count,
-      }))
-    );
+    // TODO: Implement when market_procedure_trends table is created
+    // Trends table doesn't exist yet - return empty data
+    const formattedTrends: any[] = []
+    // const trends = await prisma.market_procedure_trends.findMany({
+    //   where: {
+    //     procedure_id: parseInt(procedureId),
+    //     period: period as 'DAILY' | 'WEEKLY' | 'MONTHLY',
+    //     ...(startDate &&
+    //       endDate && {
+    //         period_date: {
+    //           gte: new Date(startDate),
+    //           lte: new Date(endDate),
+    //         },
+    //       }),
+    //   },
+    //   orderBy: {
+    //     period_date: 'asc',
+    //   },
+    // });
+    // const formattedTrends = formatTrendData(
+    //   trends.map((t: any) => ({
+    //     procedure_id: t.procedure_id,
+    //     period: t.period as 'DAILY' | 'WEEKLY' | 'MONTHLY',
+    //     period_date: t.period_date,
+    //     avg_price: t.avg_price ? Number(t.avg_price) : null,
+    //     min_price: t.min_price ? Number(t.min_price) : null,
+    //     max_price: t.max_price ? Number(t.max_price) : null,
+    //     price_change: t.price_change,
+    //     competitor_count: t.competitor_count,
+    //   }))
+    // );
 
     return NextResponse.json({
       success: true,

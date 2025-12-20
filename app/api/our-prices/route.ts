@@ -10,9 +10,9 @@ export async function GET(request: Request) {
 
     const where: {
       is_active?: boolean;
-      procedure?: {
-        subcategory: {
-          category: {
+      market_procedures?: {
+        market_procedure_subcategories: {
+          market_procedure_categories: {
             name: string;
           };
         };
@@ -25,9 +25,9 @@ export async function GET(request: Request) {
 
     // Build where clause for category filter
     if (category) {
-      where.procedure = {
-        subcategory: {
-          category: {
+      where.market_procedures = {
+        market_procedure_subcategories: {
+          market_procedure_categories: {
             name: category,
           },
         },
@@ -37,11 +37,11 @@ export async function GET(request: Request) {
     const ourPrices = await prisma.market_our_prices.findMany({
       where,
       include: {
-        procedure: {
+        market_procedures: {
           include: {
-            subcategory: {
+            market_procedure_subcategories: {
               include: {
-                category: true,
+                market_procedure_categories: true,
               },
             },
           },
@@ -66,16 +66,16 @@ export async function GET(request: Request) {
       return {
         id: price.id,
         procedure_id: price.procedure_id,
-        procedure_name: price.procedure.name,
-        category: price.procedure.subcategory.category.name,
-        subcategory: price.procedure.subcategory.name,
-        brand: price.procedure.brand,
+        procedure_name: price.market_procedures?.name || '',
+        category: price.market_procedures?.market_procedure_subcategories?.market_procedure_categories?.name || '',
+        subcategory: price.market_procedures?.market_procedure_subcategories?.name || '',
+        brand: price.market_procedures?.brand || null,
         regular_price: regularPrice,
         event_price: eventPrice,
         cost_price: costPrice,
         margin_percent: margin ? Math.round(margin * 10) / 10 : null,
         valid_from: price.valid_from,
-        valid_to: price.valid_to,
+        valid_until: price.valid_until,
         is_active: price.is_active,
         created_at: price.created_at,
         updated_at: price.updated_at,
@@ -146,15 +146,15 @@ export async function POST(request: Request) {
         event_price: event_price ? parseFloat(event_price) : null,
         cost_price: cost_price ? parseFloat(cost_price) : null,
         valid_from: new Date(valid_from),
-        valid_to: valid_to ? new Date(valid_to) : null,
+        valid_until: valid_to ? new Date(valid_to) : null,
         is_active,
       },
       include: {
-        procedure: {
+        market_procedures: {
           include: {
-            subcategory: {
+            market_procedure_subcategories: {
               include: {
-                category: true,
+                market_procedure_categories: true,
               },
             },
           },

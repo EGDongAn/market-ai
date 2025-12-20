@@ -21,32 +21,32 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     const {
-      name,
       alert_type,
       competitor_id,
       procedure_id,
-      threshold,
-      threshold_type,
-      notify_email,
+      threshold_percent,
+      threshold_value,
+      email_notify,
+      push_notify,
       is_active = true,
     } = body
 
-    if (!name || !alert_type) {
+    if (!alert_type) {
       return NextResponse.json(
-        { error: 'Name and alert_type are required' },
+        { error: 'alert_type is required' },
         { status: 400 }
       )
     }
 
     const alert = await prisma.market_alerts.create({
       data: {
-        name,
         alert_type,
         competitor_id: competitor_id || null,
         procedure_id: procedure_id || null,
-        threshold: threshold ? parseFloat(threshold) : null,
-        threshold_type: threshold_type || null,
-        notify_email: notify_email || null,
+        threshold_percent: threshold_percent ? parseFloat(threshold_percent) : null,
+        threshold_value: threshold_value ? parseFloat(threshold_value) : null,
+        email_notify: email_notify ?? true,
+        push_notify: push_notify ?? false,
         is_active,
       },
     })
